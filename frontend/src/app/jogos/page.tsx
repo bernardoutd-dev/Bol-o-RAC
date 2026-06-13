@@ -7,7 +7,7 @@ import MatchCard from './components/MatchCard'
 import { flags, matches, phaseLabels } from './data'
 
 /* ─── Types ─── */
-type Tab = 'Palpites' | 'Ranking' | 'Resultados'
+type Tab = 'Palpites' | 'Ranking' | 'Resultados' | 'Admin'
 type GameFilter = 'TODOS' | 'HOJE' | 'R1' | 'R2' | 'R3' | 'MATA'
 type OfficialFilter = 'GRUPOS' | 'MATA'
 type PickMap = Record<number, [string, string]>
@@ -31,6 +31,7 @@ const OFFICIAL_FILTERS: Array<{ key: OfficialFilter; label: string }> = [
 ]
 
 const TAB_ORDER: Tab[] = ['Palpites', 'Ranking', 'Resultados']
+const ADMIN_EMAILS = ['bernardoutd@gmail.com', 'viktormb2005@gmail.com']
 const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -81,6 +82,15 @@ export default function JogosPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
+
+  /* ─── Admin state ─── */
+  const [participants, setParticipants] = useState<{ email: string; name: string }[]>([])
+  const [adminTargetEmail, setAdminTargetEmail] = useState('')
+  const [adminTargetName, setAdminTargetName] = useState('')
+  const [adminPicks, setAdminPicks] = useState<PickMap>({})
+  const [adminFilter, setAdminFilter] = useState<GameFilter>('TODOS')
+  const [newUserEmail, setNewUserEmail] = useState('')
+  const [newUserName, setNewUserName] = useState('')
 
   /* ─── Toast ─── */
   const showToast = useCallback((msg: string, ok = true) => {
@@ -308,6 +318,59 @@ export default function JogosPage() {
     window.location.href = '/'
   }, [])
 
+  /* ─── Admin ─── */
+  const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail) : false
+
+  const loadParticipants = useCallback(async () => {
+    const { data } = await createClient().from('picks').select('user_email, user_name')
+    if (!Array.isArray(data)) return
+    const map: Record<string, string> = {}
+    data.forEach((r: { user_email: string; user_name: string | null }) => {
+      if (!map[r.user_email]) map[r.user_email] = r.user_name || r.user_email.split('@')[0]
+    })
+    setParticipants(Object.entries(map).map(([email, name]) => ({ email, name })))
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'Admin') loadParticipants()
+  }, [tab, loadParticipants])
+
+  const selectParticipant = useCallback(async (email: string, name: string) => {
+    setAdminTargetEmail(email)
+    setAdminTargetName(name)
+    setNewUserEmail('')
+    setNewUserName('')
+    const { data } = await createClient().from('picks').select('match_id, home_score, away_score').eq('user_email', email)
+    setAdminPicks(Array.isArray(data)
+      ? data.reduce<PickMap>((acc, r) => { acc[r.match_id] = [String(r.home_score ?? ''), String(r.away_score ?? '')]; return acc }, {})
+      : {}
+    )
+  }, [])
+
+  const handleAdminPickChange = useCallback((matchId: number, side: 0 | 1, value: string) => {
+    const raw = value.replace(/[^0-9]/g, '')
+    const norm = raw === '' ? '' : String(Math.max(0, Math.min(99, Number(raw))))
+    setAdminPicks(prev => ({
+      ...prev,
+      [matchId]: side === 0 ? [norm, prev[matchId]?.[1] ?? ''] : [prev[matchId]?.[0] ?? '', norm],
+    }))
+  }, [])
+
+  const saveAdminPicks = useCallback(async () => {
+    if (!adminTargetEmail) { showToast('Selecione um participante', false); return }
+    await persistPicks(adminPicks, adminTargetEmail, adminTargetName)
+  }, [adminPicks, adminTargetEmail, adminTargetName, persistPicks, showToast])
+
+  const activateNewUser = useCallback(() => {
+    if (!newUserEmail.includes('@')) { showToast('E-mail inválido', false); return }
+    if (newUserName.trim().length < 2) { showToast('Nome muito curto', false); return }
+    setAdminTargetEmail(newUserEmail.trim())
+    setAdminTargetName(newUserName.trim())
+    setAdminPicks({})
+    setNewUserEmail('')
+    setNewUserName('')
+  }, [newUserEmail, newUserName, showToast])
+
   /* ─── Filtered matches ─── */
   const filteredMatches = useMemo(() => matches.filter(m => {
     if (gameFilter === 'TODOS') return true
@@ -330,6 +393,23 @@ export default function JogosPage() {
     }
     return result
   }, [filteredMatches])
+
+  const adminFilteredMatches = useMemo(() => matches.filter(m => {
+    if (adminFilter === 'TODOS') return true
+    if (adminFilter === 'HOJE') return m.date === today
+    if (adminFilter === 'MATA') return !['R1', 'R2', 'R3'].includes(m.stage)
+    return m.stage === adminFilter
+  }), [adminFilter, today])
+
+  const adminMatchGroups = useMemo(() => {
+    const result: Array<{ date: string; items: typeof adminFilteredMatches }> = []
+    for (const m of adminFilteredMatches) {
+      const last = result[result.length - 1]
+      if (!last || last.date !== m.date) result.push({ date: m.date, items: [m] })
+      else last.items.push(m)
+    }
+    return result
+  }, [adminFilteredMatches])
 
   /* ─── Loading screen ─── */
   if (loading) {
@@ -596,6 +676,98 @@ export default function JogosPage() {
         <button className="btn-gold" onClick={saveOfficial}>Salvar resultados oficiais</button>
       </div>
 
+      {/* ══════════════════════════════
+          TAB: ADMIN
+         ══════════════════════════════ */}
+      {isAdmin && (
+        <div className={tab !== 'Admin' ? 'hide' : ''}>
+          <p className="of-note">🛡️ <b>Painel Admin</b> — edite palpites de qualquer participante, incluindo jogos encerrados.</p>
+
+          {/* Participant selector */}
+          <div className="panel">
+            <h2 className="display" style={{ fontSize: '15px', marginBottom: '12px' }}>👤 Participante</h2>
+
+            {participants.map(p => (
+              <div
+                key={p.email}
+                className={`admin-user-row ${adminTargetEmail === p.email ? 'active' : ''}`}
+                onClick={() => selectParticipant(p.email, p.name)}
+              >
+                <div className="admin-user-name">{p.name}</div>
+                <div className="admin-user-email">{p.email}</div>
+              </div>
+            ))}
+
+            {participants.length === 0 && (
+              <p style={{ color: 'var(--muted)', fontSize: '13px', textAlign: 'center', padding: '8px 0' }}>
+                Nenhum participante ainda
+              </p>
+            )}
+
+            <hr className="sheet-divider" style={{ margin: '14px 0 10px' }} />
+
+            <p style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Novo participante
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input className="auth-input" type="email" placeholder="E-mail" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} />
+              <input className="auth-input" type="text" placeholder="Nome" value={newUserName} onChange={e => setNewUserName(e.target.value)} />
+              <button className="btn-ghost" onClick={activateNewUser}>Selecionar novo →</button>
+            </div>
+          </div>
+
+          {/* Picks for selected participant */}
+          {adminTargetEmail && (
+            <>
+              <div className="panel" style={{ padding: '10px 14px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
+                  Editando: <strong style={{ color: 'var(--gold)' }}>{adminTargetName}</strong>
+                  <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {adminTargetEmail}</span>
+                </p>
+              </div>
+
+              <div className="chips">
+                {GAME_FILTERS.map(f => (
+                  <button key={f.key} className={`chip ${adminFilter === f.key ? 'on' : ''}`} onClick={() => setAdminFilter(f.key)}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {adminMatchGroups.map(({ date, items }) => (
+                <div key={date}>
+                  <div className="day-head">
+                    {formatDay(date)}
+                    {date === today && <span className="today-badge">Hoje</span>}
+                  </div>
+                  {items.map(m => {
+                    const homeLabel = m.home || teams[m.id]?.[0] || ''
+                    const awayLabel = m.away || teams[m.id]?.[1] || ''
+                    return (
+                      <MatchCard
+                        key={m.id}
+                        match={m}
+                        flags={flags}
+                        pick={adminPicks[m.id] ?? ['', '']}
+                        official={official[m.id] ?? null}
+                        disabled={false}
+                        homeLabel={homeLabel}
+                        awayLabel={awayLabel}
+                        onPickChange={handleAdminPickChange}
+                      />
+                    )
+                  })}
+                </div>
+              ))}
+
+              <button className="btn-gold" onClick={saveAdminPicks}>
+                Salvar palpites de {adminTargetName}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ─── Toast ─── */}
       {toast && (
         <div
@@ -610,7 +782,7 @@ export default function JogosPage() {
         </div>
       )}
 
-      <BottomNav activeTab={tab} onTabChange={setTab} />
+      <BottomNav activeTab={tab} onTabChange={setTab} isAdmin={isAdmin} />
     </main>
   )
 }

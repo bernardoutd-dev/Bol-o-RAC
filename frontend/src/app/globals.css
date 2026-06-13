@@ -572,6 +572,23 @@ body { padding-bottom: 84px; }
 .btn-danger:hover  { background: rgba(255, 106, 61, 0.15); }
 .btn-danger:active { transform: scale(0.97); background: rgba(255, 106, 61, 0.2); }
 
+/* ─── Admin panel ─── */
+.admin-user-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.admin-user-row:hover  { background: rgba(255,207,63,0.05); border-color: rgba(255,207,63,0.25); }
+.admin-user-row.active { background: rgba(255,207,63,0.1);  border-color: var(--gold); }
+.admin-user-name  { font-size: 14px; font-weight: 700; color: var(--chalk); }
+.admin-user-email { font-size: 11.5px; color: var(--muted); }
+
 /* ─────────────────────────────────────────
    AUTH (LOGIN PAGE)
 ───────────────────────────────────────── */
