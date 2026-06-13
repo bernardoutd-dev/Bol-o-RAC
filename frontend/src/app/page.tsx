@@ -41,12 +41,17 @@ export default function LoginPage() {
     const supabase = createClient()
 
     if (mode === 'login') {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+      const { data: loginData, error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) {
         setError('E-mail ou senha incorretos. Tente novamente.')
         setLoading(false)
         return
       }
+      const nomeMeta = loginData.user?.user_metadata?.nome as string | undefined
+      await supabase.from('profiles').upsert(
+        { email, nome: nomeMeta || email.split('@')[0] },
+        { onConflict: 'email', ignoreDuplicates: true }
+      )
     } else {
       const { error: err } = await supabase.auth.signUp({
         email,
@@ -60,6 +65,10 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
+      await supabase.from('profiles').upsert(
+        { email, nome: name.trim() },
+        { onConflict: 'email', ignoreDuplicates: true }
+      )
     }
 
     router.push('/jogos')

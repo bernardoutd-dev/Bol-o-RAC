@@ -322,13 +322,12 @@ export default function JogosPage() {
   const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail) : false
 
   const loadParticipants = useCallback(async () => {
-    const { data } = await createClient().from('picks').select('user_email, user_name')
+    const { data } = await createClient().from('profiles').select('email, nome').order('nome')
     if (!Array.isArray(data)) return
-    const map: Record<string, string> = {}
-    data.forEach((r: { user_email: string; user_name: string | null }) => {
-      if (!map[r.user_email]) map[r.user_email] = r.user_name || r.user_email.split('@')[0]
-    })
-    setParticipants(Object.entries(map).map(([email, name]) => ({ email, name })))
+    setParticipants(data.map((r: { email: string; nome: string }) => ({
+      email: r.email,
+      name: r.nome || r.email.split('@')[0],
+    })))
   }, [])
 
   useEffect(() => {
