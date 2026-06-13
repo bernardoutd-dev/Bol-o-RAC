@@ -186,4 +186,8 @@ export const matches: MatchData[] = rawMatches.map((entry) => ({
   time: entry[4],
   home: entry[5],
   away: entry[6],
-}))
+})).sort((a, b) => {
+  const da = a.date + 'T' + a.time
+  const db = b.date + 'T' + b.time
+  return da < db ? -1 : da > db ? 1 : 0
+})
