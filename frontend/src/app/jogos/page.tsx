@@ -212,7 +212,7 @@ export default function JogosPage() {
     })
 
     rows.sort((a, b) => b.pts - a.pts || b.exact - a.exact || a.name.localeCompare(b.name))
-    setRankingRows(rows.filter(r => !ADMIN_EMAILS.includes(r.email)))
+    setRankingRows(rows.filter(r => r.email !== 'viktormb2005@gmail.com'))
     setRankingLoading(false)
   }, [])
 
