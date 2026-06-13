@@ -611,7 +611,7 @@ export default function JogosPage() {
             <div key={m.id} className="match">
               <div className="m-meta">
                 <span className="grp">{stageLabel}</span>
-                <span className="m-time">{m.time} · Brasília</span>
+                <span className="m-time">{formatDay(m.date)} · {m.time}</span>
               </div>
 
               {isKnockout && (
