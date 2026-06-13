@@ -588,7 +588,7 @@ export default function JogosPage() {
          ══════════════════════════════ */}
       <div className={tab !== 'Resultados' ? 'hide' : ''}>
         <p className="of-note">
-          ⚙️ Área do administrador: lance os <b>resultados oficiais</b> e preencha os times do mata-mata quando forem definidos. Só uma pessoa mexe aqui! 😉
+          ⚙️ <b>Resultados oficiais</b> — pode lançar antes ou depois do jogo. Os palpites são pontuados automaticamente.
         </p>
 
         <div className="chips">

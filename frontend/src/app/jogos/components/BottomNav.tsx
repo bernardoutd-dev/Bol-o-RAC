@@ -16,7 +16,7 @@ const NAV_ITEMS: Array<{ key: Tab; label: string; icon: string }> = [
 ]
 
 export default function BottomNav({ activeTab, onTabChange, isAdmin }: BottomNavProps) {
-  const items = isAdmin ? NAV_ITEMS : NAV_ITEMS.slice(0, 3)
+  const items = isAdmin ? NAV_ITEMS : NAV_ITEMS.slice(0, 2)
   return (
     <nav className="bottom-nav" role="navigation" aria-label="Navegação principal">
       {items.map(item => (
