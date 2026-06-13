@@ -1,6 +1,6 @@
 'use client'
 
-type Tab = 'Palpites' | 'Ranking' | 'Resultados'
+type Tab = 'Palpites' | 'Ranking' | 'Resultados' | 'Admin'
 
 type BottomNavProps = {
   activeTab: Tab
